@@ -17,11 +17,16 @@ app.use('/api', apiRoutes);
 app.get('/api', (req, res) => {
   res.json({
     name: 'Mock Data Generator API',
-    version: '1.0.0',
+    version: '1.1.0',
     endpoints: {
       'POST /api/parse': '解析数据模型',
       'POST /api/generate': '生成数据',
       'POST /api/generate/page': '分页生成数据',
+      'POST /api/generate/skip': '跳过指定数量生成数据',
+      'POST /api/generate/variants': '生成多组变体数据（种子派生）',
+      'POST /api/generate/derived': '生成派生数据（种子派生）',
+      'POST /api/seed/derive': '派生单个子种子',
+      'POST /api/seed/derive-multiple': '批量派生子种子',
       'POST /api/export/json': '导出JSON',
       'POST /api/export/csv': '导出CSV',
       'GET /api/types': '获取支持的类型和格式',

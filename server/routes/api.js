@@ -89,6 +89,107 @@ router.post('/generate/page', (req, res) => {
   }
 });
 
+router.post('/generate/variants', (req, res) => {
+  try {
+    const { model, count = 10, seed, variants } = req.body;
+    const parsedModel = modelParser.parse(model);
+    const generator = new DataGenerator(seed);
+
+    const variantRules = variants.map(v => {
+      if (typeof v === 'string') {
+        return { name: v, region: v };
+      }
+      return v;
+    });
+
+    const result = generator.generateWithVariants(parsedModel, count, variantRules);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.post('/generate/derived', (req, res) => {
+  try {
+    const { model, count = 10, seed, rule, index = 0 } = req.body;
+    const parsedModel = modelParser.parse(model);
+    const generator = new DataGenerator(seed);
+
+    const result = generator.generateDerived(parsedModel, count, rule, { index });
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.post('/seed/derive', (req, res) => {
+  try {
+    const { baseSeed, rule, index = 0 } = req.body;
+    const RandomGenerator = require('../utils/random');
+    
+    const derivedSeed = RandomGenerator.deriveSeed(baseSeed, rule, index);
+    
+    res.json({
+      success: true,
+      data: {
+        baseSeed: baseSeed,
+        derivedSeed: derivedSeed,
+        rule: rule,
+        index: index
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.post('/seed/derive-multiple', (req, res) => {
+  try {
+    const { baseSeed, rule, count = 5 } = req.body;
+    const RandomGenerator = require('../utils/random');
+    
+    const derivedSeeds = [];
+    for (let i = 0; i < count; i++) {
+      derivedSeeds.push({
+        index: i,
+        seed: RandomGenerator.deriveSeed(baseSeed, rule, i)
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        baseSeed: baseSeed,
+        rule: rule,
+        count: count,
+        derivedSeeds: derivedSeeds
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 router.post('/export/json', (req, res) => {
   try {
     const { model, count = 100, seed, data } = req.body;

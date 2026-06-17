@@ -1,8 +1,11 @@
 const seedrandom = require('seedrandom');
+const crypto = require('crypto');
 
 class RandomGenerator {
-  constructor(seed = null) {
+  constructor(seed = null, parentSeed = null, derivationRule = null) {
     this.setSeed(seed);
+    this.parentSeed = parentSeed;
+    this.derivationRule = derivationRule;
   }
 
   setSeed(seed) {
@@ -17,6 +20,14 @@ class RandomGenerator {
 
   getSeed() {
     return this.seed;
+  }
+
+  getParentSeed() {
+    return this.parentSeed;
+  }
+
+  getDerivationRule() {
+    return this.derivationRule;
   }
 
   random() {
@@ -66,6 +77,38 @@ class RandomGenerator {
     return result;
   }
 
+  static hashSeed(input) {
+    return crypto.createHash('sha256').update(input.toString()).digest('hex');
+  }
+
+  static deriveSeed(baseSeed, rule, index = 0) {
+    const ruleStr = typeof rule === 'object' ? JSON.stringify(rule) : String(rule);
+    const seedInput = `${baseSeed}|${ruleStr}|${index}`;
+    return RandomGenerator.hashSeed(seedInput);
+  }
+
+  deriveChild(rule, index = 0) {
+    const childSeed = RandomGenerator.deriveSeed(this.seed, rule, index);
+    return new RandomGenerator(childSeed, this.seed, rule);
+  }
+
+  deriveChildren(rule, count) {
+    const children = [];
+    for (let i = 0; i < count; i++) {
+      children.push(this.deriveChild(rule, i));
+    }
+    return children;
+  }
+
+  deriveNamedChildren(rules) {
+    const children = {};
+    rules.forEach((rule, index) => {
+      const key = typeof rule === 'object' ? (rule.name || `child_${index}`) : String(rule);
+      children[key] = this.deriveChild(rule, index);
+    });
+    return children;
+  }
+
   static createSeededGenerator(seed) {
     return new RandomGenerator(seed);
   }
@@ -73,6 +116,19 @@ class RandomGenerator {
   static createRowGenerator(baseSeed, rowIndex) {
     const rowSeed = `${baseSeed}-row-${rowIndex}`;
     return new RandomGenerator(rowSeed);
+  }
+
+  static createDerivedGenerator(baseSeed, rule, index = 0) {
+    const childSeed = RandomGenerator.deriveSeed(baseSeed, rule, index);
+    return new RandomGenerator(childSeed, baseSeed, rule);
+  }
+
+  static createDerivedGenerators(baseSeed, rule, count) {
+    const generators = [];
+    for (let i = 0; i < count; i++) {
+      generators.push(RandomGenerator.createDerivedGenerator(baseSeed, rule, i));
+    }
+    return generators;
   }
 }
 

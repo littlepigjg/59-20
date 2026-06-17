@@ -33,8 +33,8 @@ class DataGenerator {
     return results;
   }
 
-  generateOne(model, rowIndex = 0) {
-    const rowRng = RandomGenerator.createRowGenerator(this.baseSeed, rowIndex);
+  generateOne(model, rowIndex = 0, rng = null) {
+    const rowRng = rng || RandomGenerator.createRowGenerator(this.baseSeed, rowIndex);
     const result = {};
 
     model.fields.forEach(field => {
@@ -46,6 +46,78 @@ class DataGenerator {
     });
 
     return result;
+  }
+
+  generateWithVariants(model, count, variantRules, options = {}) {
+    if (!model || !model.fields) {
+      throw new Error('无效的数据模型');
+    }
+
+    if (options.seed !== undefined) {
+      this.setSeed(options.seed);
+    }
+
+    const baseRng = this.random;
+    const variantGenerators = baseRng.deriveNamedChildren(variantRules);
+    const variants = {};
+
+    for (const [variantKey, variantRng] of Object.entries(variantGenerators)) {
+      const variantData = [];
+      const rule = variantRng.getDerivationRule();
+      const fieldOverrides = typeof rule === 'object' ? rule.fieldOverrides || {} : {};
+
+      for (let i = 0; i < count; i++) {
+        const rowRng = RandomGenerator.createRowGenerator(variantRng.getSeed(), i);
+        const record = this.generateOne(model, i, rowRng);
+
+        for (const [fieldName, overrideFn] of Object.entries(fieldOverrides)) {
+          if (record[fieldName] !== undefined && typeof overrideFn === 'function') {
+            record[fieldName] = overrideFn(record[fieldName], rowRng, i);
+          }
+        }
+
+        variantData.push(record);
+      }
+
+      variants[variantKey] = {
+        seed: variantRng.getSeed(),
+        parentSeed: variantRng.getParentSeed(),
+        derivationRule: rule,
+        data: variantData
+      };
+    }
+
+    return {
+      baseSeed: this.baseSeed,
+      count: count,
+      variants: variants
+    };
+  }
+
+  generateDerived(model, count, derivationRule, options = {}) {
+    if (!model || !model.fields) {
+      throw new Error('无效的数据模型');
+    }
+
+    if (options.seed !== undefined) {
+      this.setSeed(options.seed);
+    }
+
+    const derivedRng = this.random.deriveChild(derivationRule, options.index || 0);
+    const results = [];
+
+    for (let i = 0; i < count; i++) {
+      const rowRng = RandomGenerator.createRowGenerator(derivedRng.getSeed(), i);
+      results.push(this.generateOne(model, i, rowRng));
+    }
+
+    return {
+      baseSeed: this.baseSeed,
+      derivedSeed: derivedRng.getSeed(),
+      derivationRule: derivationRule,
+      count: count,
+      data: results
+    };
   }
 
   generateField(field, rng) {
@@ -101,19 +173,22 @@ class DataGenerator {
   }
 
   generateString(rule, rng) {
+    const prefix = rule.prefix || '';
+    const suffix = rule.suffix || '';
+    
     if (rule.options && rule.options.length > 0) {
-      return rule.prefix + rng.randomChoice(rule.options) + rule.suffix;
+      return prefix + rng.randomChoice(rule.options) + suffix;
     }
 
     if (rule.pattern) {
-      return rule.prefix + this.generateFromPattern(rule.pattern, rng) + rule.suffix;
+      return prefix + this.generateFromPattern(rule.pattern, rng) + suffix;
     }
 
     if (rule.format) {
-      return rule.prefix + this.generateFormat(rule.format, rng) + rule.suffix;
+      return prefix + this.generateFormat(rule.format, rng) + suffix;
     }
 
-    return rule.prefix + this.generateRandomString(rule.minLength, rule.maxLength, rng) + rule.suffix;
+    return prefix + this.generateRandomString(rule.minLength, rule.maxLength, rng) + suffix;
   }
 
   generateFormat(format, rng) {
